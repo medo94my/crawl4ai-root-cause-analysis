@@ -841,14 +841,12 @@ def main():
     logger.info("Dashboard will be available at: http://localhost:8000")
     logger.info("Press Ctrl+C to stop")
     
-    config = uvicorn.Config(
+    uvicorn.run(
         app=app,
         host="0.0.0.0",
         port=8000,
         log_level="info"
     )
-    
-    uvicorn.run(config)
 
 
 if __name__ == "__main__":
