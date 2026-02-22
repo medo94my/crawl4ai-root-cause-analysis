@@ -9,8 +9,7 @@ uvicorn[standard]>=0.24.0
 jinja2>=3.1.2
 python-multipart>=0.0.6
 
-# GitHub CLI (for web mode)
-gh>=2.40.0
+# GitHub CLI is already installed system-wide
 
 # Optional: For advanced features
 # sentence-transformers>=2.2.0  # For semantic analysis
