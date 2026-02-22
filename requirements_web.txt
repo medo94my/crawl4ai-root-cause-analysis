@@ -1,0 +1,27 @@
+# Core dependencies (from requirements.txt)
+httpx>=0.24.0
+click>=8.0.0
+pydantic>=2.0.0
+
+# Web UI dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+jinja2>=3.1.2
+python-multipart>=0.0.6
+
+# GitHub CLI (for web mode)
+gh>=2.40.0
+
+# Optional: For advanced features
+# sentence-transformers>=2.2.0  # For semantic analysis
+# bandit>=1.7.0              # For static analysis
+# pylint>=2.17.0              # For code quality checks
+
+# Testing (optional)
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+
+# Development (optional)
+# black>=23.0.0
+# isort>=5.12.0
+# mypy>=1.4.0
