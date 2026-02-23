@@ -164,7 +164,7 @@ class IssueIngestionEngine:
 
         # Build full text including comments for richer analysis
         comment_bodies = "\n\n".join(
-            c.get('body', '') if isinstance(c, dict) else str(c)
+            (c.get('body', '') or '') if isinstance(c, dict) else str(c)
             for c in (github_issue.comments or [])
             if c
         )
