@@ -40,6 +40,7 @@ class Fix:
     test_cases: List[str]
     patch: str
     confidence: float
+    pattern_name: str = ""
 
 
 class FixGenerator:
@@ -132,6 +133,7 @@ class FixGenerator:
             test_cases=root_cause.test_cases,
             patch=patch,
             confidence=root_cause.confidence,
+            pattern_name=root_cause.pattern_name,
         )
 
     def _apply_fix(self, code: str, template: Dict) -> Optional[str]:

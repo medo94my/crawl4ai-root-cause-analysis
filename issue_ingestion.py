@@ -159,20 +159,31 @@ class IssueIngestionEngine:
         """
         logger.info(f"Parsing issue #{github_issue.number}: {github_issue.title}")
 
+        # None-guard for body
+        body = github_issue.body or ""
+
+        # Build full text including comments for richer analysis
+        comment_bodies = "\n\n".join(
+            c.get('body', '') if isinstance(c, dict) else str(c)
+            for c in (github_issue.comments or [])
+            if c
+        )
+        full_text = body + ("\n\n" + comment_bodies if comment_bodies else "")
+
         # Determine issue type
         issue_type = self._classify_issue_type(github_issue)
 
-        # Extract code snippets
-        code_snippets = self._extract_code_snippets(github_issue.body)
+        # Extract code snippets from body + comments
+        code_snippets = self._extract_code_snippets(full_text)
 
-        # Extract errors
-        errors = self._extract_errors(github_issue.body)
+        # Extract errors from body + comments
+        errors = self._extract_errors(full_text)
 
-        # Extract metadata
-        metadata = self._extract_metadata(github_issue.body)
+        # Extract metadata from full text
+        metadata = self._extract_metadata(full_text)
 
-        # Extract keywords
-        keywords = self._extract_keywords(github_issue.title + ' ' + github_issue.body)
+        # Extract keywords from title + full text
+        keywords = self._extract_keywords(github_issue.title + ' ' + full_text)
 
         # Determine priority
         priority = self._determine_priority(github_issue, keywords, errors)

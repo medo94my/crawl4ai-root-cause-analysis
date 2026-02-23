@@ -11,6 +11,7 @@ Usage:
     pr_url = gh.create_pr(title, body, branch)
 """
 
+import re
 import subprocess
 import json
 import logging
@@ -44,6 +45,25 @@ class GitHubCLI:
 
         logger.info(f"GitHubCLI initialized for {self.full_repo}")
 
+    @staticmethod
+    def parse_issue_url(url: str) -> int:
+        """
+        Parse a GitHub issue URL and return the issue number.
+
+        Args:
+            url: Full GitHub issue URL (e.g. https://github.com/owner/repo/issues/123)
+
+        Returns:
+            Issue number as integer
+
+        Raises:
+            ValueError: If URL doesn't match expected format
+        """
+        match = re.search(r'/issues/(\d+)', url)
+        if not match:
+            raise ValueError(f"Could not parse issue number from URL: {url}")
+        return int(match.group(1))
+
     def _verify_gh_auth(self):
         """Verify that gh CLI is installed and authenticated."""
         try:
@@ -51,10 +71,10 @@ class GitHubCLI:
                 ['gh', 'auth', 'status'],
                 capture_output=True,
                 text=True,
-                check=True,
             )
 
-            if 'Logged in' in result.stdout:
+            combined = result.stdout + result.stderr
+            if 'Logged in' in combined or 'oauth_token' in combined or 'token' in combined.lower():
                 logger.info("✅ GitHub CLI authenticated")
                 return True
             else:
@@ -64,9 +84,6 @@ class GitHubCLI:
         except FileNotFoundError:
             logger.error("❌ GitHub CLI not found. Install with: https://cli.github.com/")
             raise RuntimeError("GitHub CLI not installed")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"❌ GitHub CLI error: {e}")
-            raise RuntimeError("GitHub CLI authentication failed")
 
     def _run_command(self, args: List[str], json_output: bool = True) -> Any:
         """
@@ -158,7 +175,7 @@ class GitHubCLI:
 
     def get_issue(self, issue_number: int) -> Optional[Dict]:
         """
-        Get a specific issue.
+        Get a specific issue including comments.
 
         Args:
             issue_number: Issue number
@@ -166,10 +183,21 @@ class GitHubCLI:
         Returns:
             Issue dictionary or None
         """
-        # Specify JSON fields required for issue view
-        json_fields = 'number,title,body,state,author,labels,createdAt,updatedAt,url'
+        # Specify JSON fields required for issue view (includes comments)
+        json_fields = 'number,title,body,state,author,labels,createdAt,updatedAt,url,comments'
         args = ['issue', 'view', str(issue_number), '--repo', self.full_repo, '--json', json_fields]
         issue = self._run_command(args, json_output=True)
+
+        # Extract comment bodies
+        raw_comments = issue.get('comments', [])
+        comments = [
+            {
+                'author': c.get('author', {}).get('login', '') if isinstance(c.get('author'), dict) else '',
+                'body': c.get('body', ''),
+                'created_at': c.get('createdAt', ''),
+            }
+            for c in raw_comments
+        ]
 
         return {
             'id': issue.get('id', 0),
@@ -183,6 +211,7 @@ class GitHubCLI:
             'updated_at': issue['updatedAt'],
             'html_url': issue['url'],
             'comments_url': f"https://api.github.com/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments",
+            'comments': comments,
         }
 
     def create_pr(

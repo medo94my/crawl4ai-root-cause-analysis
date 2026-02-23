@@ -61,17 +61,25 @@ class RootCause:
 class RootCauseAnalyzer:
     """Performs static code analysis to find root causes."""
 
-    def __init__(self, codebase_path: str = "/root/.openclaw/workspace/crawl4ai-repo"):
+    def __init__(self, codebase_path: Optional[str] = None):
         """
         Initialize root cause analyzer.
 
         Args:
-            codebase_path: Path to the codebase to analyze
+            codebase_path: Path to the codebase to analyze. Defaults to ~/crawl4ai-repo.
+                           If None, static analysis is skipped gracefully.
         """
-        self.codebase_path = Path(codebase_path)
+        if codebase_path is None:
+            codebase_path = str(Path.home() / "crawl4ai-repo")
+        self.codebase_path = Path(os.path.expanduser(codebase_path))
         self.code_cache: Dict[str, str] = {}
         self.ast_cache: Dict[str, ast.Module] = {}
-        logger.info(f"RootCauseAnalyzer initialized with codebase: {codebase_path}")
+
+        if not self.codebase_path.exists():
+            logger.warning(f"Codebase path not found: {self.codebase_path}")
+            logger.warning("Static analysis will be skipped. To enable, clone: gh repo clone unclecode/crawl4ai ~/crawl4ai-repo")
+        else:
+            logger.info(f"RootCauseAnalyzer initialized with codebase: {self.codebase_path}")
 
     def analyze(
         self,
@@ -127,6 +135,65 @@ class RootCauseAnalyzer:
 
         logger.warning("No bug patterns found in relevant files")
         return None
+
+    def check_resolution(self, root_cause: 'RootCause') -> Dict:
+        """
+        Check if the root cause has already been resolved in the current codebase.
+
+        Args:
+            root_cause: RootCause object from analysis
+
+        Returns:
+            Dict with keys: resolved (bool), evidence (str)
+        """
+        if not self.codebase_path.exists():
+            return {"resolved": False, "evidence": "Codebase path not available — cannot check resolution"}
+
+        try:
+            file_path = self.codebase_path / root_cause.file
+            if not file_path.exists():
+                return {"resolved": False, "evidence": f"File not found: {root_cause.file}"}
+
+            content = self._load_file(str(file_path))
+            lines = content.split('\n')
+
+            pattern = root_cause.pattern_name
+            target_line = root_cause.line_number
+
+            # Window of lines to inspect around the reported location
+            start = max(0, target_line - 5)
+            end = min(len(lines), target_line + 5)
+            context = '\n'.join(lines[start:end])
+
+            if pattern == 'encoding_issue':
+                if 'encoding="utf-8"' in context or "encoding='utf-8'" in context:
+                    return {"resolved": True, "evidence": f"Found encoding='utf-8' near line {target_line} in {root_cause.file}"}
+                return {"resolved": False, "evidence": f"No encoding parameter found near line {target_line}"}
+
+            elif pattern == 'timeout_issue':
+                if 'timeout=' in context:
+                    return {"resolved": True, "evidence": f"Found timeout= parameter near line {target_line} in {root_cause.file}"}
+                return {"resolved": False, "evidence": f"No timeout parameter found near line {target_line}"}
+
+            elif pattern == 'docker_path_issue':
+                if 'base64' in context or 'return' in context:
+                    return {"resolved": True, "evidence": f"Found base64/return pattern near line {target_line} — may be resolved"}
+                return {"resolved": False, "evidence": f"File write without base64 return found near line {target_line}"}
+
+            elif pattern == 'async_error_handling':
+                if 'asyncio.TimeoutError' in context or 'CancelledError' in context:
+                    return {"resolved": True, "evidence": f"Found asyncio error handling near line {target_line}"}
+                return {"resolved": False, "evidence": f"Incomplete async error handling near line {target_line}"}
+
+            else:
+                # Generic check: look for the suggested fix in the file
+                if root_cause.suggested_fix and root_cause.suggested_fix.strip() in content:
+                    return {"resolved": True, "evidence": "Suggested fix already present in codebase"}
+                return {"resolved": False, "evidence": f"No resolution evidence found for pattern '{pattern}'"}
+
+        except Exception as e:
+            logger.error(f"Error checking resolution: {e}")
+            return {"resolved": False, "evidence": f"Error during resolution check: {e}"}
 
     def _find_relevant_files(self, suggested_files: List[str]) -> List[str]:
         """

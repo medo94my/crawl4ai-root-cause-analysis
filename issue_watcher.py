@@ -17,7 +17,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 import httpx
 
@@ -43,6 +43,7 @@ class GitHubIssue:
     updated_at: str
     html_url: str
     comments_url: str
+    comments: list = field(default_factory=list)
 
 
 class GitHubAPI:
